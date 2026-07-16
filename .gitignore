@@ -1,0 +1,36 @@
+# Environment variables file
+.env
+
+# Database backups & local temporary seed data (keep .gitkeep files)
+database/backups/*
+!database/backups/.gitkeep
+database/seed/*
+!database/seed/.gitkeep
+
+# IDE settings and configurations
+.idea/
+*.iws
+*.iml
+*.ipr
+.classpath
+.project
+.settings/
+.vscode/
+
+# OS-specific files
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# Build artifacts and temporary files
+backend/target/
+backend/bin/
+backend/build/
+backend/out/
+backend/.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+# Local logs
+*.log
+logs/
