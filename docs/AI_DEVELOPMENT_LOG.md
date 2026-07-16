@@ -414,7 +414,80 @@ Safeguarding passwords by hashing them before persistence, protecting database p
 - Using JPA callback annotations keeps auditing attributes logic centralized within the entity itself.
 
 ## Preparation for Phase 4
-The user management persistence and business layers are complete. We are now ready to transition to **Phase 4: Spring Security**, where we will integrate Spring Security filters, write Authentication filters, customize AuthenticationManagers, and configure security access rules.
+The user management persistence and business layers are complete. We are now ready to transition to **Phase 4: User Registration API**, where we will expose REST registration endpoints, validation rules, and integration test coverage.
+
+---
+
+# Phase 4 – User Registration API
+
+## Objective
+Implement a secure, validated REST endpoint for registering users (`POST /api/v1/users/register`) that processes user input DTOs, validates constraint requirements, delegates database persistence to the service layer, and handles system conflicts and validation exceptions gracefully.
+
+## Why this phase exists
+The Presentation/Controller Layer acts as the gateway to the application. Exposing a secure endpoint separates REST transport logic (HTTP statuses, payload parsing, validation checks) from internal service layer operations. Standardizing API contracts ensures frontends and integration services consume predictable response shapes.
+
+## Files Created
+- [UserController.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/controller/UserController.java) - Exposes REST endpoints for user actions.
+- [UserControllerTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/controller/UserControllerTest.java) - Integration tests asserting successful registration, bad validation states, and duplication conflicts.
+
+## Files Modified
+- [docs/SETUP.md](file:///c:/Dev/Secure-File-Vault/docs/SETUP.md) - Documented payload examples.
+- [docs/ARCHITECTURE.md](file:///c:/Dev/Secure-File-Vault/docs/ARCHITECTURE.md) - Noted Controller layer mappings.
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Packages Added
+- `com.saimanikantha.securefilevault.controller`
+
+## Classes Added
+- `UserController`
+- `UserControllerTest`
+
+## Configuration Changes
+None.
+
+## Request Flow
+- `POST /api/v1/users/register` -> `UserController` -> JSR-380 input validation checks (`@Valid`) -> If invalid, throws `MethodArgumentNotValidException` -> Caught by `GlobalExceptionHandler` -> Returns HTTP 400 Bad Request with field errors map.
+- If valid, passes `UserRegisterRequest` payload -> `UserService.register()` -> Repository lookup checks -> If duplicate username/email, throws `UserAlreadyExistsException` -> Caught by `GlobalExceptionHandler` -> Returns HTTP 409 Conflict.
+- If unique, hashes password via BCrypt -> Persists user -> Maps to `UserResponse` DTO -> Returns HTTP 201 Created wrapped in standard `ApiResponse` envelope.
+
+## Architecture Decisions
+- Separated status transmission by using Spring's `ResponseEntity` wrapper to determine actual HTTP response headers while retaining `statusCode` properties inside the JSON `ApiResponse` payload.
+- Avoided writing redundant controller code by mapping all routes under `ApiPaths.BASE_PATH` and relying strictly on constructor injection.
+
+## Spring Concepts Used
+- **`@RestController` & `@RequestMapping`**: Declares Spring MVC controllers returning raw JSON serializable payloads.
+- **`@Valid` & `@RequestBody`**: Triggers Spring Validator engine to intercept invalid incoming payloads before dispatching to controllers.
+- **`MockMvc` & `@AutoConfigureMockMvc`**: Performs web-layer testing with complete Spring integration context mocking without spinning up actual HTTP containers.
+
+## Best Practices Applied
+- Kept controller logic thin; delegates mapping and business logic entirely to `UserMapper` and `UserService` layers.
+- Used standard HTTP verbs and status codes: registration operations return `201 Created` on success, client payload errors return `400 Bad Request`, and conflicts return `409 Conflict`.
+
+## Security Considerations
+- Kept raw credentials out of controller printouts by leveraging Lombok parameters exclusion.
+- Prevented credential leakages by only transferring `UserResponse` DTO payloads, completely hiding password hashes.
+- Configured REST tests under `@Transactional` to roll back changes, maintaining local test database integrity.
+
+## Performance Notes
+- Leveraged JSON serialization optimizations by standardizing Jackson serializing parameters.
+- Kept memory usage low by avoiding heavy session bindings (REST routes operate strictly stateless).
+
+## Common Mistakes Avoided
+- Avoided duplicating exception advice mappings; the pre-existing `GlobalExceptionHandler` intercepts validation failures and conflicts dynamically.
+- Avoided hardcoding URL prefixes by injecting centralized `ApiPaths.BASE_PATH` constants.
+
+## How this phase prepares the next phase
+The user registration presentation and domain foundations are complete. We are now ready to transition to **Phase 5: Spring Security**, where we will install Spring Security filters, configure Custom UserDetailsService to perform password authentication checks, establish security policy overrides, and protect routes.
+
+## Interview Questions
+1. **What is the difference between `@Valid` and `@Validated` in Spring Boot controllers?**
+   - `@Valid` is a standard Jakarta Bean Validation annotation used to trigger validation on a single method parameter (like `@RequestBody`). `@Validated` is a Spring-specific annotation that can be used on classes to enable validation on method arguments (such as `@PathVariable` or `@RequestParam` parameters) and supports validation grouping (validating different subsets of properties based on execution context).
+2. **How does `MockMvc` verify REST APIs without starting a web server?**
+   - `MockMvc` is part of Spring's test framework. It mocks the entire Servlet container lifecycle (`DispatcherServlet`, handlers, filters, interceptors) directly in JVM memory. Rather than binding to a port and making true HTTP network requests, it dispatches simulated request objects directly to the controller endpoints, saving resources and executing test suites significantly faster.
+
+## Summary
+Phase 4 successfully exposed the user registration endpoint (`POST /api/v1/users/register`) with full validation constraints (JSR-380) and exception advice mapping, fully verified through a suite of MockMvc integration tests for validation error arrays, successful created states, and database unique conflicts.
+
 
 
 

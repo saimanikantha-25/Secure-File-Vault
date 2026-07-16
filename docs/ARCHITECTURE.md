@@ -71,11 +71,12 @@ The user management subsystem handles registration, security credentials storage
 
 1. **User Schema**: The user persistence model is stored in the `app_users` table with unique indexes on both `username` and `email` to accelerate profile retrievals.
 2. **Password Cryptography**: Passwords are never stored in plaintext. We isolate a standalone `BCryptPasswordEncoder` bean which produces secure, randomly salted one-way hashes using the standard BCrypt algorithm.
-3. **Registration Flow**:
-   - The request is serialized through `UserRegisterRequest` validating field constraints (such as minimum password length of 8, valid email shape, etc.).
-   - `UserServiceImpl` validates unique constraints via repository checks. In case of conflicts, a `UserAlreadyExistsException` (409 Conflict) is thrown.
-   - Raw credentials are encrypted using `PasswordEncoder`.
-   - The user record is stored under default `Role.USER`.
-   - The resulting record is mapped to a secure `UserResponse` DTO, which omits credential hashes and details only client-safe metadata.
+3. **Registration REST Endpoint & Flow**:
+   - The presentation layer exposes `POST /api/v1/users/register` via `UserController`.
+   - The request body is bound to `UserRegisterRequest` and validated via Spring's `@Valid` annotation to enforce constraints (username size, email format, minimum password length).
+   - If validation fails, `GlobalExceptionHandler` intercepts `MethodArgumentNotValidException` and returns a 400 Bad Request with a field validation map.
+   - `UserServiceImpl` validates unique database constraints, throwing `UserAlreadyExistsException` (409 Conflict) on violations, which is caught and converted by the exception advice.
+   - Credentials are BCrypt hashed, the user is saved with `Role.USER`, and mapped to a `UserResponse` DTO returned inside a standard `ApiResponse` envelope within a `201 Created` HTTP response wrapper.
+
 
 

@@ -67,3 +67,65 @@ Ensure you have the following installed on your system:
    *Note: Flyway migrations (e.g. system health schemas and users table schemas) execute automatically at startup, creating system schemas.*
 4. Confirm health check is green by visiting:
    `http://localhost:8080/actuator/health`
+
+## API Documentation (Endpoints Example)
+
+### User Registration API
+- **Endpoint**: `POST /api/v1/users/register`
+- **Content-Type**: `application/json`
+
+**Sample Request Payload**:
+```json
+{
+  "username": "validuser",
+  "email": "validuser@example.com",
+  "password": "Password123!",
+  "firstName": "John",
+  "lastName": "Doe"
+}
+```
+
+**Sample Success Response (201 Created)**:
+```json
+{
+  "success": true,
+  "message": "User registered successfully",
+  "data": {
+    "id": 1,
+    "username": "validuser",
+    "email": "validuser@example.com",
+    "firstName": "John",
+    "lastName": "Doe",
+    "role": "USER",
+    "createdAt": "2026-07-16T16:15:47Z"
+  },
+  "timestamp": "2026-07-16T16:15:47.123Z",
+  "statusCode": 201
+}
+```
+
+**Sample Validation Failure Response (400 Bad Request)**:
+```json
+{
+  "success": false,
+  "message": "Validation failed",
+  "data": {
+    "password": ["Password must be at least 8 characters long"],
+    "email": ["Invalid email format"]
+  },
+  "timestamp": "2026-07-16T16:15:48.456Z",
+  "statusCode": 400
+}
+```
+
+**Sample Duplicate Conflict Response (409 Conflict)**:
+```json
+{
+  "success": false,
+  "message": "Username 'validuser' is already registered.",
+  "data": null,
+  "timestamp": "2026-07-16T16:15:49.789Z",
+  "statusCode": 409
+}
+```
+
