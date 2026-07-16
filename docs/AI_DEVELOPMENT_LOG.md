@@ -138,3 +138,119 @@ Standardize the main application entry point to use standard Spring Boot annotat
 ## Lessons Learned
 - Spring Boot allows auto-configurations to be excluded via configuration properties (`spring.autoconfigure.exclude`) as a clean alternative to the `@SpringBootApplication(exclude = ...)` annotation code. This keeps our source code standard and adaptable to different profile settings.
 
+---
+
+# Phase 1 – Backend Foundation
+
+## Objective
+Build a reusable, standardized backend infrastructure to handle generic responses, exceptions mappings, global configurations, validation bindings, logging, and date utilities for all future business endpoints.
+
+## Architecture Decisions
+- **Isolated Component Directories**: Structured the common elements into isolated packages organized by their responsibilities: `dto/common`, `exception`, `constants`, and `util`.
+- **Standardized Response Protocol**: Defined a standard response model `ApiResponse<T>` using Lombok builder patterns to enforce consistent payload structures for both success and error responses. Using `java.time.Instant` in `ApiResponse` ensures standardized ISO 8601 formatting during JSON serialization.
+- **Hierarchical Exception Design**: Formulated a standard custom exception hierarchy starting with `ApplicationException` containing `HttpStatus` to bind error contexts directly to HTTP routing.
+- **Sterilized Error Responses**: Implemented `GlobalExceptionHandler` with `@RestControllerAdvice` to trap controller-level and framework-level errors (JSR-380 validation and generic exceptions), logging stack traces internally while returning sterilized `ApiResponse` responses to prevent information leakage.
+- **Speculative Configuration Exclusions**: Excluded writing placeholder configurations, security settings, database connectors, or business layers to preserve project clarity and prevent unnecessary code.
+
+## Packages Added
+- `com.saimanikantha.securefilevault.dto.common`
+- `com.saimanikantha.securefilevault.exception`
+- `com.saimanikantha.securefilevault.constants`
+- `com.saimanikantha.securefilevault.util`
+
+## Classes Added
+- [ApiResponse](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/common/ApiResponse.java)
+- [ApplicationException](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ApplicationException.java)
+- [ResourceNotFoundException](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ResourceNotFoundException.java)
+- [ValidationException](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ValidationException.java)
+- [GlobalExceptionHandler](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/GlobalExceptionHandler.java)
+- [ApiPaths](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApiPaths.java)
+- [ApplicationConstants](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApplicationConstants.java)
+- [ErrorMessages](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ErrorMessages.java)
+- [DateTimeUtil](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/util/DateTimeUtil.java)
+- [ResponseUtil](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/util/ResponseUtil.java)
+
+## Files Created
+- [ApiResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/common/ApiResponse.java)
+- [ApplicationException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ApplicationException.java)
+- [ResourceNotFoundException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ResourceNotFoundException.java)
+- [ValidationException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/ValidationException.java)
+- [GlobalExceptionHandler.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/GlobalExceptionHandler.java)
+- [ApiPaths.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApiPaths.java)
+- [ApplicationConstants.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApplicationConstants.java)
+- [ErrorMessages.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ErrorMessages.java)
+- [DateTimeUtil.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/util/DateTimeUtil.java)
+- [ResponseUtil.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/util/ResponseUtil.java)
+
+## Files Modified
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Spring Concepts Used
+- **`@RestControllerAdvice`**: Global interceptor applied to REST controller mappings to handle exceptions uniformly.
+- **`@ExceptionHandler`**: Annotation mapping specific exception classes to handler methods inside the advice.
+- **`MethodArgumentNotValidException`**: The framework exception thrown when validating parameters annotated with `@Valid`.
+
+## Best Practices
+- **Single Responsibility Principle (SRP)**: Each class is dedicated to a singular task: date utility format, HTTP exception responses, error messages, or custom exception types.
+- **Secure Error Mapping**: Prevented the disclosure of database/system structures to clients by trapping parent exceptions and masking them as HTTP 500 while preserving logs on the backend server.
+- **Standardized REST Payloads**: Implemented uniform success and error structures to allow easier integration for web and mobile clients.
+- **Lombok Boilerplate Reduction**: Employed Lombok annotations (`@Data`, `@Builder`, `@Getter`, `@Slf4j`) to keep files clean and readable.
+
+## Security Considerations
+- Trapping `Exception.class` prevents leaking database dialect, connection strings, null pointers, and internal file paths to API clients, blocking trace-reconnaissance vulnerabilities.
+- Left the `.env` local settings out of GitHub by matching git rules to root targets.
+
+## Performance Notes
+- `java.time.Instant` provides standard clock timestamping with minimal CPU cycles and maps directly to native machine representations.
+- All constants are declared final and static to minimize allocation footprints.
+
+## Interview Questions
+1. **How does Spring's `@RestControllerAdvice` handle exception dispatching internally?**
+   - When an exception occurs during controller method execution, the `DispatcherServlet` delegates exception resolution to a chain of handler resolvers, particularly `ExceptionHandlerExceptionResolver`. This resolver scans for classes annotated with `@RestControllerAdvice` containing methods with `@ExceptionHandler` corresponding to the thrown exception hierarchy, executing the closest matching type.
+2. **Why is using a unified response wrapper (`ApiResponse`) beneficial in production APIs?**
+   - It guarantees that clients receive a consistent payload shape (e.g., matching envelope properties like status, success, timestamp, message) regardless of whether the operation was a success or failure, simplifying client-side deserialization, logging, and error handling.
+
+## Resume Value
+- Architected the core foundation of a Spring Boot 3.5.x REST API, implementing global controller advices (`@RestControllerAdvice`) and a standardized JSON contract layout (`ApiResponse`) to handle request state reporting.
+- Designed a secure exception handling protocol that maps internal runtime events (JSR-380 validation, database states, custom runtime anomalies) into standardized HTTP status codes while suppressing raw diagnostic stack traces.
+
+## Lessons Learned
+- Using default Jackson configs to serialize `java.time.Instant` objects ensures consistent, region-independent ISO 8601 formatting without custom code or formatting overrides.
+
+## Preparation for Phase 2
+The core system features generic error handlers, response structures, custom Exceptions, and standard utilities. We are now ready to transition to **Phase 2: Database Layer**, where we will install and configure MySQL connectivity, implement Flyway/Liquibase schema migrations, create datasource properties, and map JPA persistence engines.
+
+---
+
+# Phase 1 Refinements – Code Cleanup, Logging Split, and Validation Envelope Adjustments
+
+## Objective
+Refine the Phase 1 base structures by removing duplicate utility layers, mapping multiple messages to the validation properties payload, updating constants, and adjusting logging priorities based on error visibility.
+
+## Problem Being Solved
+1. Removing redundant abstractions (`DateTimeUtil`, `ResponseUtil`) that duplicate native Java Time and Lombok builder functionality.
+2. Handling multiple validation message boundaries on a single input field to comply with JSR-380 multi-constraint mappings.
+3. Separating expected client-level 4xx messages from server-side 5xx exceptions in exception handlers to prevent noise in server logs.
+
+## Architecture Decisions
+- Deleted the `DateTimeUtil` and `ResponseUtil` classes.
+- Altered JSR-380 validation mapping inside [GlobalExceptionHandler](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/GlobalExceptionHandler.java) to compile errors under a `Map<String, List<String>>` signature.
+- Split log handlers inside [GlobalExceptionHandler](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/GlobalExceptionHandler.java) to write client exceptions (4xx) at `WARN` level and server exceptions (500) at `ERROR` level.
+- Pruned `SYSTEM_BASE` path from [ApiPaths](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApiPaths.java) and renamed [ErrorMessages](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ErrorMessages.java) keys to `RESOURCE_NOT_FOUND`, `VALIDATION_FAILED`, and `INTERNAL_SERVER_ERROR`.
+
+## Files Deleted
+- `DateTimeUtil.java` (removed duplicate abstractions)
+- `ResponseUtil.java` (removed duplicate abstractions)
+
+## Files Modified
+- [GlobalExceptionHandler.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/GlobalExceptionHandler.java)
+- [ApiPaths.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ApiPaths.java)
+- [ErrorMessages.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/ErrorMessages.java)
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Lessons Learned
+- Removing helper wrappers (like custom date/response utilities) when Java Time libraries and Lombok builder interfaces already provide minimal, expressive operations prevents developer-facing abstraction overload and keeps the codebase simple.
+- Grouping constraint failures under a mapping of lists (`Map<String, List<String>>`) ensures that multiple JSR-380 constraint violations on the same variable (e.g., both `@NotNull` and `@Size`) are preserved and reported to client integrations.
+
+
+
