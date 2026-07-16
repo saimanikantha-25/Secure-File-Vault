@@ -23,13 +23,29 @@ Ensure you have the following installed on your system:
    *Note: `.env` is ignored by git to protect credentials.*
 
 2. **Configure Database**:
-   Log in to MySQL and create the database specified in `.env`:
+   Log in to MySQL and run the initialization script to create the database:
    ```sql
-   CREATE DATABASE secure_file_vault;
+   SOURCE database/schema/create_database.sql;
    ```
 
-3. **Backend Configuration**:
-   The backend reads credentials from properties matched to environment variables. In later phases, we will bind application properties to environment configurations.
+3. **Backend Environment Variables Configuration**:
+   The backend reads connection parameters from environment variables. Ensure these variables are exported in your terminal before building/running, or defined in your IDE configuration:
+   - On Windows (PowerShell):
+     ```powershell
+     $env:DB_HOST="localhost"
+     $env:DB_PORT="3306"
+     $env:DB_NAME="secure_file_vault"
+     $env:DB_USERNAME="root"
+     $env:DB_PASSWORD="your_mysql_password"
+     ```
+   - On Linux/macOS:
+     ```bash
+     export DB_HOST="localhost"
+     export DB_PORT="3306"
+     export DB_NAME="secure_file_vault"
+     export DB_USERNAME="root"
+     export DB_PASSWORD="your_mysql_password"
+     ```
 
 ## Running the Application
 
@@ -48,5 +64,6 @@ Ensure you have the following installed on your system:
    ```bash
    .\mvnw spring-boot:run
    ```
+   *Note: Flyway migrations execute automatically at startup, creating system schemas.*
 4. Confirm health check is green by visiting:
    `http://localhost:8080/actuator/health`

@@ -50,3 +50,18 @@ The Java package structure under `com.saimanikantha.securefilevault` is organize
 1. **Separation of Concerns**: Each layer is strictly decoupled. Controllers only manage request parsing/validation and return DTO response envelopes. Services execute transaction-bound business steps. Persistence layers manage database interactions.
 2. **Coding to Interfaces**: Services are defined as interfaces to decouple implementations and facilitate unit testing through mock dependencies.
 3. **Stateless Operations**: The REST controllers are stateless. Client state is managed via secure, cryptographically-signed JWT tokens.
+
+## Persistence and Database Layer
+
+Secure File Vault integrates MySQL 8 as its primary relational database. Data persistence operations are designed with safety, traceablity, and strict configuration governance in mind:
+
+1. **JPA & Spring Data JPA**: The persistence layer uses Spring Data JPA built on top of Hibernate. For security and database integrity, Hibernate's automatic schema alterations are disabled:
+   - `spring.jpa.hibernate.ddl-auto` is configured strictly to `validate`. Hibernate validates schemas during bootstrap but will not write to or execute DDL changes on the database.
+2. **Flyway Migration Engine**: All schema changes and table structures are managed strictly and chronologically using Flyway migrations.
+   - SQL scripts are maintained under `backend/src/main/resources/db/migration/`.
+   - On application startup, Flyway automatically reads the `flyway_schema_history` table to run pending schema updates.
+3. **HikariCP Connection Pool**: High-performance database connection pooling is configured with:
+   - Max pool size of 10 connections.
+   - Eager minimum idle configuration of 2 connections.
+   - Connection timeouts set to prevent resource starvation.
+

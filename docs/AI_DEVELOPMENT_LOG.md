@@ -252,5 +252,79 @@ Refine the Phase 1 base structures by removing duplicate utility layers, mapping
 - Removing helper wrappers (like custom date/response utilities) when Java Time libraries and Lombok builder interfaces already provide minimal, expressive operations prevents developer-facing abstraction overload and keeps the codebase simple.
 - Grouping constraint failures under a mapping of lists (`Map<String, List<String>>`) ensures that multiple JSR-380 constraint violations on the same variable (e.g., both `@NotNull` and `@Size`) are preserved and reported to client integrations.
 
+---
+
+# Phase 2 – Database Layer
+
+## Objective
+Configure and establish the relational database persistence infrastructure by integrating MySQL, Spring Data JPA, HikariCP connection pooling, and Flyway schema migrations.
+
+## Why this phase exists
+Modern, production-grade applications require robust database governance. Setting up managed database layers ensures:
+1. Version-controlled, reproducible SQL migration rollouts, ensuring that schemas across environments are synchronized automatically.
+2. High-performance, bounded connection pooling configurations (HikariCP) to handle application load without leaking database resources.
+3. Strict JPA schema rules (Hibernate validation mode only) to prevent auto-generated Hibernate code from rewriting schemas dynamically.
+
+## Problem Being Solved
+Preventing manual database schema updates (which lead to drift across dev, staging, and production environments), optimizing database connections to prevent memory depletion, and ensuring that Hibernate behaves as a read/write mapper without executing destructive DDL migrations.
+
+## Files Created
+- [create_database.sql](file:///c:/Dev/Secure-File-Vault/database/schema/create_database.sql) - Database schema creation helper.
+- [V1__init_db_health.sql](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/db/migration/V1__init_db_health.sql) - Flyway baseline migration verification table `system_health_check`.
+
+## Files Modified
+- [backend/pom.xml](file:///c:/Dev/Secure-File-Vault/backend/pom.xml) - Added Flyway dependencies.
+- [backend/src/main/resources/application.properties](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/application.properties) - Configured database datasource, connection pool, JPA Hibernate validation, and Flyway triggers.
+- [docs/SETUP.md](file:///c:/Dev/Secure-File-Vault/docs/SETUP.md) - Documented database initialization commands and environment settings.
+- [docs/ARCHITECTURE.md](file:///c:/Dev/Secure-File-Vault/docs/ARCHITECTURE.md) - Documented database pooling structures and migration designs.
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Packages Added
+None.
+
+## Classes Added
+None.
+
+## Dependencies Added
+- `org.flywaydb:flyway-core`
+- `org.flywaydb:flyway-database-mysql`
+
+## Configuration Changes
+- Removed properties-level autoconfiguration exclusions.
+- Configured standard placeholders for `spring.datasource.url`, `spring.datasource.username`, and `spring.datasource.password`.
+- Added HikariCP parameters (`maximum-pool-size=10`, `minimum-idle=2`).
+- Configured JPA to validate schema: `spring.jpa.hibernate.ddl-auto=validate`.
+- Configured Flyway initialization parameters: `spring.flyway.enabled=true`, `spring.flyway.baseline-on-migrate=false`.
+
+## Request Flow
+- Application Startup -> Spring Container initializes HikariCP -> Flyway scans `db/migration/` -> Executes missing SQL migrations -> Connects to MySQL -> Runs Hibernate JPA validation checks -> Exposes Web context.
+- `GET /actuator/health` -> Spring Actuator -> Invokes `DataSourceHealthIndicator` -> Queries connection -> Returns `{"status": "UP"}`.
+
+## Security Considerations
+- Kept environment variable credentials out of source code by utilizing runtime property placeholders (`${DB_PASSWORD:}`).
+- Set Hibernate DDL auto-generation to `validate` to prevent accidental loss of data or structure modifications in production.
+- Kept local `.env` configuration out of git using root gitignore rules.
+
+## Performance Notes
+- Configured Hikari connection parameters: max pool bounds keep connections stable and prevent thread deadlock issues, while minimum idle keeps lightweight standby connections warm.
+
+## Interview Questions
+1. **Why do we use Flyway migrations instead of letting Hibernate generate tables automatically (e.g. `ddl-auto=update`)?**
+   - Hibernate auto-generation (`ddl-auto=update` or `create`) is fine for prototyping but dangerous for production. It does not provide version tracking, cannot handle complex index additions or data conversions, and might drop/alter tables unexpectedly causing data loss. Flyway migrations provide exact SQL version controls, audit logs via the `flyway_schema_history` table, and guarantee identical schemas across environments.
+2. **What does `spring.jpa.hibernate.ddl-auto=validate` do?**
+   - It tells Hibernate to check the database schema at startup to ensure it matches the entities defined in the application. If there are mismatches, the application context fails to start. This prevents mismatch errors at runtime and protects the database against write deviations.
+
+## Resume Value
+- Implemented automated database migration control using Flyway MySQL support, ensuring version-controlled schemas across dev and staging.
+- Configured a robust database persistence pool using HikariCP and Spring Data JPA, mapping variables to runtime environment environments, and securing schema rules via Hibernate `validate` restrictions.
+
+## Lessons Learned
+- Spring Boot 3.x splits Flyway database support into specific jars; adding `flyway-database-mysql` alongside `flyway-core` is required for MySQL migrations.
+- Disabling auto-configuration exclusions and moving database settings to properties allows Spring Boot Actuator's `DataSourceHealthIndicator` to automatically report database health out of the box.
+
+## Preparation for Phase 3
+The database layer compiles, migrates, and validates connection contexts successfully. We are now ready to transition to **Phase 3: Authentication**, where we will define the user models, user storage interfaces, password hashing services, and verification endpoints.
+
+
 
 
