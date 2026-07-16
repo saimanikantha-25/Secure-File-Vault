@@ -64,6 +64,6 @@ Ensure you have the following installed on your system:
    ```bash
    .\mvnw spring-boot:run
    ```
-   *Note: Flyway migrations execute automatically at startup, creating system schemas.*
+   *Note: Flyway migrations (e.g. system health schemas and users table schemas) execute automatically at startup, creating system schemas.*
 4. Confirm health check is green by visiting:
    `http://localhost:8080/actuator/health`

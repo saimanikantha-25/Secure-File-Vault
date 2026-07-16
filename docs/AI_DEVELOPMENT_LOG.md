@@ -325,6 +325,98 @@ None.
 ## Preparation for Phase 3
 The database layer compiles, migrates, and validates connection contexts successfully. We are now ready to transition to **Phase 3: Authentication**, where we will define the user models, user storage interfaces, password hashing services, and verification endpoints.
 
+---
+
+# Phase 3 – User Management Foundation
+
+## Objective
+Establish the core User domain model and infrastructure including the `app_users` table migration, `User` entity mappings, BCrypt password hashing, registration DTO validation, user mapping layer, and `UserService` registration logic.
+
+## Why this phase exists
+A secure application requires a solid identity model. In this phase, we establish a robust user persistence and validation structure:
+1. Version-controlled SQL schema layout (`app_users` table) with optimized search indexes on key unique columns (`username`, `email`).
+2. Standalone, modular encryption context configuration (`spring-security-crypto`) to hash credentials without adding routing complexities.
+3. Decoupled request and response models (DTOs) with JSR-380 input validation ensuring clean boundary inputs.
+4. Comprehensive integration tests proving persistence operations, indexing, and uniqueness constraints.
+
+## Problem Being Solved
+Safeguarding passwords by hashing them before persistence, protecting database performance with unique indexes, standardizing DTO structures, isolating security layers from standard APIs, and verifying core database operations with unit/integration testing.
+
+## Files Created
+- [V2__create_users_table.sql](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/db/migration/V2__create_users_table.sql) - Flyway migration for user schema.
+- [Role.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/entity/Role.java) - Enum for User roles (USER, ADMIN).
+- [User.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/entity/User.java) - User persistence model mapping `app_users` table.
+- [UserRepository.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/repository/UserRepository.java) - JPA database repository.
+- [UserRegisterRequest.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/request/UserRegisterRequest.java) - Registration payload DTO.
+- [UserResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/response/UserResponse.java) - User summary return DTO.
+- [SecurityConfig.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/SecurityConfig.java) - PasswordEncoder bean configuration.
+- [UserMapper.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/mapper/UserMapper.java) - Entity/DTO mapper.
+- [UserService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/UserService.java) - Registration business layer interface.
+- [UserServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/impl/UserServiceImpl.java) - Registration business implementation.
+- [UserAlreadyExistsException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/UserAlreadyExistsException.java) - Custom Conflict (409) Exception class.
+- [UserRepositoryTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/repository/UserRepositoryTest.java) - Repository integration tests.
+
+## Files Modified
+- [backend/pom.xml](file:///c:/Dev/Secure-File-Vault/backend/pom.xml) - Added spring-security-crypto dependency.
+- [docs/SETUP.md](file:///c:/Dev/Secure-File-Vault/docs/SETUP.md) - Noted users migrations.
+- [docs/ARCHITECTURE.md](file:///c:/Dev/Secure-File-Vault/docs/ARCHITECTURE.md) - Added User Domain Architecture sections.
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Packages Added
+- `com.saimanikantha.securefilevault.entity`
+- `com.saimanikantha.securefilevault.repository`
+- `com.saimanikantha.securefilevault.mapper`
+- `com.saimanikantha.securefilevault.service`
+- `com.saimanikantha.securefilevault.service.impl`
+
+## Classes/Enums Added
+- `User`
+- `Role`
+- `UserRepository`
+- `UserRegisterRequest`
+- `UserResponse`
+- `SecurityConfig`
+- `UserMapper`
+- `UserService`
+- `UserServiceImpl`
+- `UserAlreadyExistsException`
+
+## Dependencies Added
+- `org.springframework.security:spring-security-crypto`
+
+## Configuration Changes
+- Declared a standard `PasswordEncoder` bean inside `SecurityConfig.java`.
+
+## Request Flow
+- User Registration request payload -> JSR-380 input validation annotations -> `UserService.register()` -> Check if username or email exists in `UserRepository` -> Encrypt raw password via `PasswordEncoder.encode()` -> Map to Entity -> Persist database -> Map to `UserResponse` -> Return success.
+
+## Security Considerations
+- Kept raw passwords out of the database by applying one-way BCrypt hashing with automatic salting.
+- Suppressed password hashes from responses by using a clean response DTO (`UserResponse`).
+- Strictly isolated user infrastructure by omitting security filter chains, session state controllers, and login endpoints.
+
+## Performance Notes
+- Placed non-clustered database index nodes (`idx_users_username` and `idx_users_email`) on user lookup attributes to optimize execution.
+
+## Interview Questions
+1. **Why is it essential to use a separate response DTO (`UserResponse`) instead of returning the `User` entity directly?**
+   - Returning database entities directly is bad practice. It can leak sensitive fields (like password hashes, security tokens) or internal database structural details to clients. It also tightens coupling between the presentation layer and database schema. Using a clean DTO isolates security and enables flexible property modeling for clients.
+2. **How does `@PrePersist` and `@PreUpdate` work in JPA?**
+   - These are JPA lifecycle callback annotations. Methods marked with `@PrePersist` are executed automatically before the SQL `INSERT` is executed on the database, allowing us to set creation timestamps. Methods marked with `@PreUpdate` are executed before SQL `UPDATE` queries, ensuring that update timestamps are automatically maintained by Hibernate.
+
+## Resume Value
+- Designed the User Management persistence and business logic foundation for a secure SaaS application.
+- Configured BCrypt cryptography workflows to secure credentials and defined custom conflict Exception Handlers to map duplicate checks into standard REST 409 envelopes.
+- Programmed end-to-end repository integration test coverage using JUnit and Spring Boot integration tests.
+
+## Lessons Learned
+- Spring Security's cryptography library (`spring-security-crypto`) can be integrated as a standalone dependency, which avoids pulling in Spring Security filters or default HTTP Basic login redirects.
+- Using JPA callback annotations keeps auditing attributes logic centralized within the entity itself.
+
+## Preparation for Phase 4
+The user management persistence and business layers are complete. We are now ready to transition to **Phase 4: Spring Security**, where we will integrate Spring Security filters, write Authentication filters, customize AuthenticationManagers, and configure security access rules.
+
+
 
 
 

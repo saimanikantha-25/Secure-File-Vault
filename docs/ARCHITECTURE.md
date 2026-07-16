@@ -65,3 +65,17 @@ Secure File Vault integrates MySQL 8 as its primary relational database. Data pe
    - Eager minimum idle configuration of 2 connections.
    - Connection timeouts set to prevent resource starvation.
 
+## User Management Foundation
+
+The user management subsystem handles registration, security credentials storage, role classification, and user domain mappings:
+
+1. **User Schema**: The user persistence model is stored in the `app_users` table with unique indexes on both `username` and `email` to accelerate profile retrievals.
+2. **Password Cryptography**: Passwords are never stored in plaintext. We isolate a standalone `BCryptPasswordEncoder` bean which produces secure, randomly salted one-way hashes using the standard BCrypt algorithm.
+3. **Registration Flow**:
+   - The request is serialized through `UserRegisterRequest` validating field constraints (such as minimum password length of 8, valid email shape, etc.).
+   - `UserServiceImpl` validates unique constraints via repository checks. In case of conflicts, a `UserAlreadyExistsException` (409 Conflict) is thrown.
+   - Raw credentials are encrypted using `PasswordEncoder`.
+   - The user record is stored under default `Role.USER`.
+   - The resulting record is mapped to a secure `UserResponse` DTO, which omits credential hashes and details only client-safe metadata.
+
+
