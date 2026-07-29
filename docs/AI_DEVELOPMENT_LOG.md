@@ -477,16 +477,114 @@ None.
 - Avoided hardcoding URL prefixes by injecting centralized `ApiPaths.BASE_PATH` constants.
 
 ## How this phase prepares the next phase
-The user registration presentation and domain foundations are complete. We are now ready to transition to **Phase 5: Spring Security**, where we will install Spring Security filters, configure Custom UserDetailsService to perform password authentication checks, establish security policy overrides, and protect routes.
+The user registration presentation and domain foundations are complete. We are now ready to transition to **Phase 5: JWT Authentication Foundation**, where we will define authentication logic, configure password validation, setup JWT token properties, and execute secure JWT claims signature mappings.
+
+---
+
+# Phase 5 – JWT Authentication Foundation
+
+## Objective
+Establish the cryptographic JWT token generation utilities and credentials validation services (login by username or email) returning a standard, cryptographically signed Bearer JWT token on success.
+
+## Why this phase exists
+Establishing identity assurance is the core pillar of a secure cloud vault. Integrating credentials verification at this phase ensures:
+1. Plaintext passwords are authenticated using one-way BCrypt verification models (never stored or matched manually).
+2. JWT generation follows precise security constraints, restricting claims payloads to public metrics (`sub`, `role`, `iss`, `iat`, `exp`), preventing PII leakage.
+3. Fail-fast security key validations are run at bootstrap, preventing execution using compromised, weak keys.
+4. Stateless sessions are configured as default security boundaries.
+
+## Files Created
+- [JwtProperties.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/JwtProperties.java) - Configuration properties binding prefix `app.security.jwt`.
+- [SecurityConstants.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/SecurityConstants.java) - Holds static token headers.
+- [LoginRequest.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/request/LoginRequest.java) - Login input fields payload.
+- [LoginResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/response/LoginResponse.java) - Safe login result token summary.
+- [InvalidCredentialsException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/InvalidCredentialsException.java) - Mapped HTTP 401 Unauthorized exception.
+- [JwtService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/JwtService.java) - Cryptographic token utility verifying structural limits and signature actions.
+- [CustomUserDetailsService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/CustomUserDetailsService.java) - Formulates spring security UserDetails from database user models.
+- [AuthService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/AuthService.java) - Verification contract.
+- [AuthServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/impl/AuthServiceImpl.java) - Authentication service resolving credentials in single queries.
+- [AuthController.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/controller/AuthController.java) - Exposes POST `/auth/login` endpoint.
+- [JwtServiceTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/security/JwtServiceTest.java) - Unit tests for token manipulation.
+- [AuthControllerTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/controller/AuthControllerTest.java) - Integration tests verifying authentication states.
+- [application.properties](file:///c:/Dev/Secure-File-Vault/backend/src/test/resources/application.properties) - Test config properties defining local dummy keys.
+
+## Files Modified
+- [backend/pom.xml](file:///c:/Dev/Secure-File-Vault/backend/pom.xml) - Added security and JJWT dependencies.
+- [backend/src/main/resources/application.properties](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/application.properties) - Configured properties bindings.
+- [SecurityConfig.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/SecurityConfig.java) - Set up stateless session management and endpoint permit restrictions.
+- [UserRepository.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/repository/UserRepository.java) - Added `findByUsernameOrEmail`.
+- [docs/SETUP.md](file:///c:/Dev/Secure-File-Vault/docs/SETUP.md) - Noted login endpoint payload examples.
+- [docs/ARCHITECTURE.md](file:///c:/Dev/Secure-File-Vault/docs/ARCHITECTURE.md) - Documented security workflows and token layout.
+- [docs/AI_DEVELOPMENT_LOG.md](file:///c:/Dev/Secure-File-Vault/docs/AI_DEVELOPMENT_LOG.md) - Appended this section.
+
+## Packages Added
+- `com.saimanikantha.securefilevault.security`
+
+## Classes Added
+- `JwtProperties`
+- `SecurityConstants`
+- `LoginRequest`
+- `LoginResponse`
+- `InvalidCredentialsException`
+- `JwtService`
+- `CustomUserDetailsService`
+- `AuthService`
+- `AuthServiceImpl`
+- `AuthController`
+- `JwtServiceTest`
+- `AuthControllerTest`
+
+## Configuration Changes
+- Switched session generation policy to stateless `SessionCreationPolicy.STATELESS`.
+- Configured endpoints path filters explicitly allowing health (GET), register (POST), and login (POST), and requiring authentication for all other actions.
+- Bound `app.security.jwt.secret`, `app.security.jwt.expiration-ms`, and `app.security.jwt.issuer` into `JwtProperties`.
+
+## Request Flow
+- `POST /api/v1/auth/login` -> Intercepted by `AuthController` -> Validates payload format -> Passes parameters to `AuthServiceImpl` -> Performs a single repository query `findByUsernameOrEmail` -> If not found, throws generic `InvalidCredentialsException` (401 Unauthorized) -> Compares password via `PasswordEncoder.matches()` -> Generates token through `JwtService` -> Returns `LoginResponse` (200 OK).
+
+## Architecture Decisions
+- Configured `JwtProperties` using `@ConfigurationProperties(prefix = "app.security.jwt")` to decouple key configurations.
+- Excluded users name from the token payload to protect PII security.
+- Validated `JWT_SECRET` key size, expiration time, and issuer configuration parameters during post-construction initialization phase to block insecure environments immediately.
+- Established `CustomUserDetailsService` implementing standard Spring Security `UserDetailsService` to cleanly load user configurations for upcoming filter layers.
+
+## Spring Concepts Used
+- **`@ConfigurationProperties`**: Binds system property values into standard java object instances.
+- **`SecurityFilterChain`**: Configures path access rules, stateless configurations, and authentication requirements.
+- **`@PostConstruct`**: Executes code lifecycle hooks automatically after bean dependency configurations compile.
+- **`UserDetailsService`**: Standard interface utilized by Spring Security components to resolve identity records.
+
+## Best Practices Applied
+- Used generic messaging in credential mismatches to protect system from user enumeration scans.
+- Enforced single database roundtrips by applying SQL username OR email query matching.
+- Prevented credential leakages by using distinct login request and response DTO schemas.
+
+## Security Considerations
+- Kept the signing secret key size at 256 bits or greater, ensuring cryptographic resilience.
+- Ensured stateless session configurations, completely neutralizing CSRF session vulnerability types.
+- Placed validation checks on token claims to prevent signature tampering.
+
+## Performance Notes
+- Bypassed session cookie validation, optimizing execution speeds.
+- Combined username and email lookups into a single SELECT statement, halving DB lookup costs.
+
+## Common Mistakes Avoided
+- Avoided duplicating exception advice mappings; the pre-existing `GlobalExceptionHandler` intercepts validation failures and conflicts dynamically.
+- Avoided hardcoding URL prefixes by injecting centralized `ApiPaths.BASE_PATH` constants.
+
+## How this phase prepares the next phase
+The authentication services, user details loader, token properties, and database structures are complete. We are now ready to transition to **Phase 6: Secure Routing and Filters**, where we will construct the custom `JwtAuthenticationFilter`, hook it into the Spring Security filter chain (`UsernamePasswordAuthenticationFilter`), read request authentication contexts, and secure backend REST APIs.
 
 ## Interview Questions
-1. **What is the difference between `@Valid` and `@Validated` in Spring Boot controllers?**
-   - `@Valid` is a standard Jakarta Bean Validation annotation used to trigger validation on a single method parameter (like `@RequestBody`). `@Validated` is a Spring-specific annotation that can be used on classes to enable validation on method arguments (such as `@PathVariable` or `@RequestParam` parameters) and supports validation grouping (validating different subsets of properties based on execution context).
-2. **How does `MockMvc` verify REST APIs without starting a web server?**
-   - `MockMvc` is part of Spring's test framework. It mocks the entire Servlet container lifecycle (`DispatcherServlet`, handlers, filters, interceptors) directly in JVM memory. Rather than binding to a port and making true HTTP network requests, it dispatches simulated request objects directly to the controller endpoints, saving resources and executing test suites significantly faster.
+1. **How does HS256 protect JWT tokens from tampering?**
+   - HS256 (HMAC with SHA-256) is a symmetric cryptographic algorithm. The issuer signs the payload using a secret key. When a client sends the token back, the server recalculates the signature using the same secret key and compares it to the token's signature. If any claims in the payload are altered, the signature recalculation will mismatch, allowing the server to immediately reject the token as tampered.
+2. **Why must a symmetric key for HS256 be at least 256 bits (32 bytes) long?**
+   - Cryptographic standards (like RFC 7518) dictate that HS256 signing keys must be at least 256 bits long to protect against brute-force attacks. If a key is too short, an attacker capturing a signed JWT could rapidly execute offline brute-force attacks to crack the secret key and begin forging valid administrative tokens.
 
 ## Summary
-Phase 4 successfully exposed the user registration endpoint (`POST /api/v1/users/register`) with full validation constraints (JSR-380) and exception advice mapping, fully verified through a suite of MockMvc integration tests for validation error arrays, successful created states, and database unique conflicts.
+Phase 5 established the secure JWT Authentication foundation. It introduced stateless Spring Security configurations, implemented a standalone `JwtService` that validates key safety at startup, structured a single-query user credentials lookup mapping, defined a foundational `CustomUserDetailsService` loader, and implemented MockMvc integration tests and unit tests verifying the token workflow.
+
+
 
 
 

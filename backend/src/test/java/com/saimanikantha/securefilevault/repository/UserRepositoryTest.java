@@ -11,7 +11,9 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.security.jwt.secret=test_secret_that_must_be_at_least_32_characters_long_for_hmac_sha_256"
+})
 @Transactional
 class UserRepositoryTest {
 

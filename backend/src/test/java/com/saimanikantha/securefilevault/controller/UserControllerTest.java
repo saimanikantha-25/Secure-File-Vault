@@ -16,7 +16,9 @@ import static org.hamcrest.Matchers.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@SpringBootTest
+@SpringBootTest(properties = {
+        "app.security.jwt.secret=test_secret_that_must_be_at_least_32_characters_long_for_hmac_sha_256"
+})
 @AutoConfigureMockMvc
 @Transactional
 class UserControllerTest {

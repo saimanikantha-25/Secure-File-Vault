@@ -29,7 +29,7 @@ Ensure you have the following installed on your system:
    ```
 
 3. **Backend Environment Variables Configuration**:
-   The backend reads connection parameters from environment variables. Ensure these variables are exported in your terminal before building/running, or defined in your IDE configuration:
+   The backend reads connection and security parameters from environment variables. Ensure these variables are exported in your terminal before building/running, or defined in your IDE configuration:
    - On Windows (PowerShell):
      ```powershell
      $env:DB_HOST="localhost"
@@ -37,6 +37,9 @@ Ensure you have the following installed on your system:
      $env:DB_NAME="secure_file_vault"
      $env:DB_USERNAME="root"
      $env:DB_PASSWORD="your_mysql_password"
+     $env:JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
+     $env:JWT_EXPIRATION="3600000"
+     $env:JWT_ISSUER="SecureFileVault"
      ```
    - On Linux/macOS:
      ```bash
@@ -45,6 +48,9 @@ Ensure you have the following installed on your system:
      export DB_NAME="secure_file_vault"
      export DB_USERNAME="root"
      export DB_PASSWORD="your_mysql_password"
+     export JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
+     export JWT_EXPIRATION="3600000"
+     export JWT_ISSUER="SecureFileVault"
      ```
 
 ## Running the Application
@@ -128,4 +134,45 @@ Ensure you have the following installed on your system:
   "statusCode": 409
 }
 ```
+
+### User Authentication API
+- **Endpoint**: `POST /api/v1/auth/login`
+- **Content-Type**: `application/json`
+
+**Sample Request Payload**:
+```json
+{
+  "loginIdentifier": "validuser",
+  "password": "Password123!"
+}
+```
+
+**Sample Success Response (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Authentication successful",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ2YWxpZHVzZXIiLCJyb2xlIjoiVVNFUiIsImlzcyI6IlNlY3VyZUZpbGVWYXVsdCIsImlhdCI6MTc4MzI2MDAwMCwiZXhwIjoxNzgzMjYzNjAwfQ.signature",
+    "type": "Bearer",
+    "expiresInMs": 3600000,
+    "username": "validuser",
+    "role": "USER"
+  },
+  "timestamp": "2026-07-29T11:15:47.123Z",
+  "statusCode": 200
+}
+```
+
+**Sample Invalid Credentials Response (401 Unauthorized)**:
+```json
+{
+  "success": false,
+  "message": "Invalid username or password",
+  "data": null,
+  "timestamp": "2026-07-29T11:15:48.456Z",
+  "statusCode": 401
+}
+```
+
 

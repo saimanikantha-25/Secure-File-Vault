@@ -1,0 +1,36 @@
+package com.saimanikantha.securefilevault.security;
+
+import com.saimanikantha.securefilevault.entity.User;
+import com.saimanikantha.securefilevault.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.stereotype.Service;
+
+import java.util.Collections;
+
+@Service
+@RequiredArgsConstructor
+public class CustomUserDetailsService implements UserDetailsService {
+
+    private final UserRepository userRepository;
+
+    @Override
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
+        // Query by username OR email in a single database lookup
+        User user = userRepository.findByUsernameOrEmail(username, username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with identifier: " + username));
+
+        return org.springframework.security.core.userdetails.User.builder()
+                .username(user.getUsername())
+                .password(user.getPasswordHash())
+                .authorities(Collections.singletonList(
+                        new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+                ))
+                .build();
+        // Custom fields can be extracted in Phase 6 as needed
+    }
+
+}
