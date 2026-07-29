@@ -83,8 +83,9 @@ The user management subsystem handles registration, security credentials storage
 The authentication subsystem validates user identities against credentials and issues cryptographically signed JWT tokens:
 
 1. **Security Filters Setup**:
-   - The system utilizes a stateless `SecurityFilterChain` permitting only actuator health (`GET /actuator/health`), registration (`POST /api/v1/users/register`), and login (`POST /api/v1/auth/login`) routes publicly.
-   - All other routes require authentication. Incoming requests are stateless (CSRF is disabled, session creation is stateless).
+   - The system utilizes a stateless `SecurityFilterChain` permitting only actuator health (`GET /actuator/health`), registration (`POST /api/v1/users/register`), login (`POST /api/v1/auth/login`), and test public (`GET /api/v1/test/public`) routes publicly.
+   - Registers `JwtAuthenticationFilter` (extending `OncePerRequestFilter`) preceding the default `UsernamePasswordAuthenticationFilter`.
+   - Incoming requests are stateless (CSRF is disabled, session creation is stateless).
 2. **Single-Query Lookup**:
    - Instead of checking the database twice for usernames and emails separately, `AuthServiceImpl` invokes `UserRepository.findByUsernameOrEmail(loginIdentifier, loginIdentifier)` to complete identity lookup in a single query.
 3. **Password Security Verification**:
@@ -101,10 +102,16 @@ The authentication subsystem validates user identities against credentials and i
    - Credentials returned in `LoginResponse` contain the parsed token prefix string `"Bearer"` mapped from `SecurityConstants.TOKEN_TYPE`.
 5. **Spring Security UserDetails Loading**:
    - Integrated `CustomUserDetailsService` implementing Spring Security's native `UserDetailsService`.
-   - Handles resolving user profiles using a single database query `findByUsernameOrEmail` and mapping attributes to spring security `UserDetails` objects to support standard authentication filters in subsequent phases.
-6. **Stateless Security Exceptions Handling (Phase 6 Plan)**:
-   - To prevent Spring Security from returning default HTML error pages on unauthorized or forbidden requests, we will implement a custom `AuthenticationEntryPoint` (for 401 Unauthorized) and a custom `AccessDeniedHandler` (for 403 Forbidden).
-   - These components will format security violations as standardized `ApiResponse` JSON envelopes, ensuring a unified API contract for frontend integrations.
+   - Handles resolving user profiles using a single database query `findByUsernameOrEmail` and mapping attributes to spring security `UserDetails` objects to support standard authentication filters.
+6. **Stateless Security Exceptions Handling**:
+   - Configured custom `AuthenticationEntryPoint` (`CustomAuthenticationEntryPoint`) and `AccessDeniedHandler` (`CustomAccessDeniedHandler`) to prevent Spring Security from returning default HTML error pages on unauthorized (401) or forbidden (403) requests.
+   - These components directly serialize standardized `ApiResponse` JSON envelopes, providing a consistent API contract for the client.
+7. **JWT Authentication Filter Execution Flow**:
+   - Read `Authorization` header. If missing or not starting with `Bearer `, ignore request and continue filter chain unauthenticated.
+   - Extract JWT. If valid and `SecurityContextHolder` is empty, parse username from the token, load `UserDetails`, and validate the token's signature, issuer, and expiration.
+   - Populate `UsernamePasswordAuthenticationToken` using `UserDetails` and authorities, and store inside `SecurityContextHolder`.
+   - Any `JwtException` or `IllegalArgumentException` thrown during JWT processing is intercepted by the filter, which immediately clears the security context and delegates to `CustomAuthenticationEntryPoint` to yield a standard `401 Unauthorized` JSON response.
+   - Skip filtering using `shouldNotFilter()` for actuator health, login, register, and test public paths.
 
 
 

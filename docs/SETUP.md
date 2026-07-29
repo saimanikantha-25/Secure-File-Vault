@@ -175,4 +175,50 @@ Ensure you have the following installed on your system:
 }
 ```
 
+## Route Access Verification (Phase 6)
+
+Two test routes are exposed under `/api/v1/test` to verify request authentication filter controls:
+
+### 1. Public Test Endpoint (No Authentication Needed)
+- **Method**: `GET`
+- **URL**: `/api/v1/test/public`
+- **Headers**: None
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Public endpoint access successful",
+    "data": "Public Data",
+    "timestamp": "2026-07-29T11:45:25.123Z",
+    "statusCode": 200
+  }
+  ```
+
+### 2. Protected Test Endpoint (JWT Token Required)
+- **Method**: `GET`
+- **URL**: `/api/v1/test/protected`
+- **Headers**:
+  - `Authorization`: `Bearer <your_jwt_token>`
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Protected endpoint access successful",
+    "data": "Protected Data",
+    "timestamp": "2026-07-29T11:45:30.456Z",
+    "statusCode": 200
+  }
+  ```
+- **Sample Unauthorized Error Response (401 Unauthorized)**:
+  ```json
+  {
+    "success": false,
+    "message": "Authentication required",
+    "data": null,
+    "timestamp": "2026-07-29T11:45:35.789Z",
+    "statusCode": 401
+  }
+  ```
+
+
 

@@ -584,6 +584,93 @@ The authentication services, user details loader, token properties, and database
 ## Summary
 Phase 5 established the secure JWT Authentication foundation. It introduced stateless Spring Security configurations, implemented a standalone `JwtService` that validates key safety at startup, structured a single-query user credentials lookup mapping, defined a foundational `CustomUserDetailsService` loader, and implemented MockMvc integration tests and unit tests verifying the token workflow.
 
+---
+
+# Phase 6 – JWT Authentication Filter & Request Authorization
+
+## Objective
+Implement complete JWT request authentication by intercepting incoming requests, validating signatures, resolving identities, establishing spring security context mappings, and standardizing security exceptions.
+
+## Why this phase exists
+Establishing stateless request authentication restricts access to protected application API endpoints to verified clients only. This phase:
+1. Validates that every incoming protected request holds a valid signature.
+2. Integrates authentication checks into the servlet layer to intercept requests before executing business routing.
+3. Decouples authorization rules from presentation controllers by mapping permission matches inside security configs.
+4. Preserves the API JSON contract by intercepting 401 and 403 status pages and wrapping them in the standard `ApiResponse` JSON formatting schema.
+
+## Files Created
+- [JwtAuthenticationFilter.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/JwtAuthenticationFilter.java) - Filter resolving HTTP authorization header Bearer tokens.
+- [CustomAuthenticationEntryPoint.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/CustomAuthenticationEntryPoint.java) - Handles 401 unauthorized errors in JSON.
+- [CustomAccessDeniedHandler.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/CustomAccessDeniedHandler.java) - Handles 403 forbidden errors in JSON.
+- [TestController.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/controller/TestController.java) - Helper REST controller verification endpoints located in the test source tree to prevent production leakage.
+- [JwtAuthenticationFilterTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/security/JwtAuthenticationFilterTest.java) - MockMvc integration tests for authentication filter routing.
+
+## Files Modified
+- [SecurityConfig.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/SecurityConfig.java) - Registered filter order, exception entry points, and path permits.
+- [JwtService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/JwtService.java) - Added header parsing and UserDetails validation overload.
+- [docs/ARCHITECTURE.md](file:///c:/Dev/Secure-File-Vault/docs/ARCHITECTURE.md) - Noted filter flows.
+- [docs/SETUP.md](file:///c:/Dev/Secure-File-Vault/docs/SETUP.md) - Noted verification payloads.
+
+## Packages Added
+None
+
+## Classes Added
+- `JwtAuthenticationFilter`
+- `CustomAuthenticationEntryPoint`
+- `CustomAccessDeniedHandler`
+- `TestController`
+- `JwtAuthenticationFilterTest`
+
+## Configuration Changes
+- Configured stateless filter chains to run `JwtAuthenticationFilter` before `UsernamePasswordAuthenticationFilter`.
+- Integrated `CustomAuthenticationEntryPoint` and `CustomAccessDeniedHandler` inside the http exception handling block.
+- Permitted public route `GET /api/v1/test/public` and restricted `GET /api/v1/test/protected` to authenticated users.
+
+## Request Flow
+- Incoming Request -> Intercepted by `JwtAuthenticationFilter` (skips if health/login/register/public) -> Resolves token via `Authorization` header -> Validates token validity/expiry -> Loads `UserDetails` from `CustomUserDetailsService` -> Sets authentication inside `SecurityContextHolder` -> Continues filter chain.
+- If signature fails or is expired -> Intercepted in filter -> Clear context -> Delegates to `CustomAuthenticationEntryPoint` -> Writes HTTP 401 `ApiResponse` JSON output.
+
+## Architecture Decisions
+- Configured JSON error serialization directly inside entry points because servlet-layer filter errors execute before controller advisors.
+- Placed validation checks on `SecurityContextHolder.getContext().getAuthentication() == null` to prevent duplicate authentications.
+- Reused standard spring security authentication providers (`DaoAuthenticationProvider`) to ensure compliance with enterprise-grade framework flows.
+
+## Spring Concepts Used
+- **`OncePerRequestFilter`**: Base class ensuring single execution per request thread.
+- **`SecurityContextHolder`**: Holds security principal, credentials, and authorities information.
+- **`AuthenticationEntryPoint`**: Handles authentication initiation triggers when unauthenticated calls are intercepted.
+- **`AccessDeniedHandler`**: Handles authorization failures when authenticated requests violate access constraints.
+
+## Best Practices Applied
+- Avoided complicating filter parsing code by isolating header extraction to a reusable `extractTokenFromHeader` utility inside `JwtService`.
+- Enabled fail-fast filter termination on invalid signatures, preventing secondary system processing.
+- Structured response formats to enforce consistent JSON contracts for the client application.
+
+## Security Considerations
+- Kept SecurityContext stateless, ensuring zero session state is persisted across API operations.
+- Intercepted token signature tampering dynamically in the filter to block unauthorized clients immediately.
+
+## Performance Notes
+- Leveraged `shouldNotFilter` checks to bypass regex matching on common public paths.
+- Avoided repeated UserDetails database loading by caching security contexts inside request threads.
+
+## Common Mistakes Avoided
+- Avoided duplicate authentications on requests that are pre-authenticated.
+- Handled filter chain exceptions before they reached spring MVC dispatchers to prevent default HTML white-label error pages.
+
+## How this phase prepares the next phase
+Request authentication, security contexts, and filter mappings are complete. The project is now fully secure and prepared for subsequent phases, such as setting up file upload domains and managing secure directories.
+
+## Interview Questions
+1. **Why does JwtAuthenticationFilter extend OncePerRequestFilter instead of implementing GenericFilterBean or Filter?**
+   - In Spring MVC, a single request can trigger forward, error, or include dispatches, which can cause standard servlet filters to execute multiple times during a single request lifecycle. `OncePerRequestFilter` guarantees that the filter is executed exactly once per request thread, preventing duplicate authentication processing or database queries.
+2. **Why can't CustomAuthenticationEntryPoint exceptions be caught by a @ControllerAdvice class?**
+   - `@ControllerAdvice` and `@ExceptionHandler` operate within Spring MVC's dispatcher servlet container. Because spring security filters execute much earlier in the servlet filter chain (before reaching the dispatcher servlet), any security exceptions thrown by filters are outside the scope of Spring MVC and must be handled directly at the servlet filter level.
+
+## Summary
+Phase 6 established secure request filtering and authorization. It implemented the `JwtAuthenticationFilter` checking header credentials, created custom JSON serializing entry points for 401 and 403 errors, and added JUnit integration tests covering missing headers, expired credentials, and tampered signatures.
+
+
 
 
 

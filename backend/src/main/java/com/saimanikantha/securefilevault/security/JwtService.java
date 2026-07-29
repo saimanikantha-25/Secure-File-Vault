@@ -11,6 +11,8 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import org.springframework.security.core.userdetails.UserDetails;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -46,6 +48,13 @@ public class JwtService {
         }
 
         this.signingKey = Keys.hmacShaKeyFor(secretBytes);
+    }
+
+    public String extractTokenFromHeader(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith(SecurityConstants.TOKEN_TYPE + " ")) {
+            return null;
+        }
+        return authorizationHeader.substring(SecurityConstants.TOKEN_TYPE.length() + 1);
     }
 
     public String generateToken(User user) {
@@ -92,12 +101,25 @@ public class JwtService {
 
     public boolean isTokenValid(String token, User user) {
         try {
-            Jwts.parser()
-                    .verifyWith(signingKey)
-                    .build()
-                    .parseSignedClaims(token);
-            String username = extractUsername(token);
-            return username.equals(user.getUsername()) && !isTokenExpired(token);
+            Claims claims = getClaims(token);
+            String username = claims.getSubject();
+            String issuer = claims.getIssuer();
+            return username.equals(user.getUsername()) 
+                    && !isTokenExpired(token) 
+                    && jwtProperties.getIssuer().equals(issuer);
+        } catch (JwtException | IllegalArgumentException e) {
+            return false;
+        }
+    }
+
+    public boolean isTokenValid(String token, UserDetails userDetails) {
+        try {
+            Claims claims = getClaims(token);
+            String username = claims.getSubject();
+            String issuer = claims.getIssuer();
+            return username.equals(userDetails.getUsername()) 
+                    && !isTokenExpired(token) 
+                    && jwtProperties.getIssuer().equals(issuer);
         } catch (JwtException | IllegalArgumentException e) {
             return false;
         }
