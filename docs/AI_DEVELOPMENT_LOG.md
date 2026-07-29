@@ -670,6 +670,99 @@ Request authentication, security contexts, and filter mappings are complete. The
 ## Summary
 Phase 6 established secure request filtering and authorization. It implemented the `JwtAuthenticationFilter` checking header credentials, created custom JSON serializing entry points for 401 and 403 errors, and added JUnit integration tests covering missing headers, expired credentials, and tampered signatures.
 
+# Phase 7: Refresh Token & Authentication Lifecycle
+
+## Objective
+Implement a secure, database-backed refresh token rotation (RTR) model and authentication transaction auditing to manage multiple active sessions per user, trace token lineage, detect reuse replays, and support selective session revocation.
+
+## Why this phase exists
+While access tokens (JWTs) remain short-lived and stateless, refresh tokens allow clients to maintain active sessions without asking the user to log in repeatedly. This phase:
+1. Implements Refresh Token Rotation (RTR) to prevent session hijacking.
+2. Incorporates reuse detection flags and family grouping to identify replay attacks and secure the compromised family.
+3. Decouples active sessions and audits them securely in the database to allow listing and selective revocation.
+4. Uses cryptographically strong SecureRandom 256-bit entropy values and hashes them using HMAC-SHA256 with a dedicated server secret key to prevent offline database leak attacks.
+
+## Files Created
+- [V3__create_refresh_tokens_and_audit_tables.sql](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/db/migration/V3__create_refresh_tokens_and_audit_tables.sql) - Database migration schema.
+- [RefreshToken.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/entity/RefreshToken.java) - Refresh token model.
+- [AuthAuditLog.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/entity/AuthAuditLog.java) - Security logging model.
+- [AuthEventType.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/entity/AuthEventType.java) - Auditable event enums.
+- [TokenRefreshResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/response/TokenRefreshResponse.java) - Token rotation response DTO.
+- [ActiveSessionResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/response/ActiveSessionResponse.java) - User device session DTO.
+- [TokenRefreshRequest.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/request/TokenRefreshRequest.java) - Request payload DTO.
+- [TokenRefreshException.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/exception/TokenRefreshException.java) - Refresh custom exception.
+- [RefreshTokenRepository.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/repository/RefreshTokenRepository.java) - Database repository.
+- [AuthAuditLogRepository.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/repository/AuthAuditLogRepository.java) - Database repository.
+- [RefreshCookieFactory.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/RefreshCookieFactory.java) - Cookie settings component.
+- [RefreshTokenService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/RefreshTokenService.java) - Core rotation service.
+- [RefreshTokenServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/RefreshTokenServiceImpl.java) - Core rotation service implementation.
+- [SessionService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/SessionService.java) - Session management service.
+- [SessionServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/SessionServiceImpl.java) - Session management service implementation.
+- [AuthAuditService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/AuthAuditService.java) - Audit logging service.
+- [AuthAuditServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/impl/AuthAuditServiceImpl.java) - Audit logging service implementation.
+- [SchedulerConfig.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/SchedulerConfig.java) - Scheduled job activator.
+- [RefreshProperties.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/RefreshProperties.java) - Config property bindings.
+- [TokenCleanupScheduler.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/TokenCleanupScheduler.java) - Database pruning job scheduler.
+- [RefreshTokenServiceTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/security/RefreshTokenServiceTest.java) - Unit tests.
+- [AuthControllerRefreshTest.java](file:///c:/Dev/Secure-File-Vault/backend/src/test/java/com/saimanikantha/securefilevault/controller/AuthControllerRefreshTest.java) - Integration tests.
+
+## Files Modified
+- [pom.xml](file:///c:/Dev/Secure-File-Vault/backend/pom.xml) - Added `uap-java` dependency.
+- [application.properties](file:///c:/Dev/Secure-File-Vault/backend/src/main/resources/application.properties) - Added configuration parameters.
+- [JwtProperties.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/config/JwtProperties.java) - Configured access/refresh/cleanup cron properties.
+- [SecurityConstants.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/constants/SecurityConstants.java) - Excluded sessions endpoints from wildcard permits.
+- [LoginResponse.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/dto/response/LoginResponse.java) - Added raw transient refresh token payload.
+- [AuthServiceImpl.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/service/impl/AuthServiceImpl.java) - Resolved transaction IP/User-Agent and created audit entries on login.
+- [AuthController.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/controller/AuthController.java) - Bound refresh, logout, session list, and revocation endpoints.
+- [JwtService.java](file:///c:/Dev/Secure-File-Vault/backend/src/main/java/com/saimanikantha/securefilevault/security/JwtService.java) - Supported access expiration duration configurations.
+- [.env.example](file:///c:/Dev/Secure-File-Vault/.env.example) - Added environment variables.
+
+## Classes Added
+- `RefreshToken`
+- `AuthAuditLog`
+- `AuthEventType`
+- `TokenRefreshResponse`
+- `ActiveSessionResponse`
+- `TokenRefreshRequest`
+- `TokenRefreshException`
+- `RefreshTokenRepository`
+- `AuthAuditLogRepository`
+- `RefreshCookieFactory`
+- `RefreshTokenService`
+- `RefreshTokenServiceImpl`
+- `SessionService`
+- `SessionServiceImpl`
+- `AuthAuditService`
+- `AuthAuditServiceImpl`
+- `SchedulerConfig`
+- `RefreshProperties`
+- `TokenCleanupScheduler`
+
+## Configuration Changes
+- Added `app.security.refresh.hmac-secret` for hashing tokens.
+- Added `app.security.refresh.retention-days` set to 30 days.
+- Bound HttpOnly path to `/api/v1/auth` for logout/refresh access.
+
+## Request Flow
+- Login request -> verify credentials -> AuthServiceImpl logs `LOGIN_SUCCESS` -> RefreshTokenService generates cryptographically secure 256-bit SecureRandom raw token -> compute HMAC-SHA256 hash -> save RefreshToken entity with unique `familyId` -> return raw token in transient payload -> AuthController writes refresh token to response cookie (`HttpOnly; Secure; SameSite=Strict`) -> Access token returned in JSON body.
+- Refresh request -> extract cookie -> RefreshTokenService computes HMAC hash -> load database entity -> check expiration/revocation -> generate new access token and rotated refresh token -> save new token with parent mapped -> return new token in cookie.
+- Reuse Detected -> re-submitted revoked token -> locate token -> identify revoked status -> find all family tokens -> revoke all family tokens, flag `reuseDetected = true`, `revokedReason = "TOKEN_REUSE"` -> log event `TOKEN_REUSE_DETECTED` -> throw `TokenRefreshException` -> clear cookie.
+
+## Architecture Decisions
+- Segregated refresh token management from active session listings and prunings into `RefreshTokenService` and `SessionService` to follow SRP.
+- Keyed hashing of tokens with `HMAC-SHA256` prevents attackers from reusing a stolen database leak.
+- Implemented `@Version` JPA locking on the refresh tokens table to protect against concurrent token request race conditions.
+- Enabled a 30-day forensic retention delay on cleanup tasks instead of physical deletion.
+
+## Best Practices Applied
+- Avoided custom User-Agent parser code by integrating `uap-java` library.
+- Environment profile awareness: automatically disables secure cookies on development and test environments to prevent local client issues.
+- Added transient response field annotations with `@JsonIgnore` to avoid XSS leakage of refresh tokens.
+
+## Summary
+Phase 7 established a robust refresh token lifecycle, featuring token rotation, family-level revocation, audit logging, active device lists, and environmental-aware cookies.
+
+
 
 
 

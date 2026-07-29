@@ -113,8 +113,22 @@ The authentication subsystem validates user identities against credentials and i
    - Any `JwtException` or `IllegalArgumentException` thrown during JWT processing is intercepted by the filter, which immediately clears the security context and delegates to `CustomAuthenticationEntryPoint` to yield a standard `401 Unauthorized` JSON response.
    - Skip filtering using `shouldNotFilter()` for actuator health, login, register, and test public paths.
 
+## Refresh Token & Session Management Lifecycle
 
+The session management subsystem handles token rotation, secure cookie delivery, active sessions tracking, and authentication audit logs:
 
-
-
-
+1. **Cryptographic Key Separation**:
+   - Access tokens (JWT) are signed using `app.security.jwt.secret`.
+   - Refresh tokens are hashed for database persistence using HMAC-SHA256 with a dedicated `app.security.refresh.hmac-secret`. This guarantees that if JWT keys are rotated, active refresh token sessions are not invalidated.
+2. **Refresh Token Rotation (RTR) & Reuse Forensics**:
+   - Refresh tokens are generated as URL-safe 256-bit random strings using `SecureRandom`.
+   - When a refresh token is rotated, a new sliding refresh token and access token are issued, and the predecessor is marked as `revoked = true`.
+   - Each token family is grouped by `family_id` and tracks its predecessor via `parent_token_id` (UUID lineage tracing).
+   - If a revoked token is re-submitted, the system triggers a **Reuse Detected Breach**. The entire family is flagged as `revoked = true`, `reuse_detected = true`, and a `TOKEN_REUSE_DETECTED` audit event is written.
+3. **Decoupled Service Model**:
+   - **`RefreshTokenService`**: Handles random entropy generation, HMAC-SHA256 hashing, and token family invalidations.
+   - **`SessionService`**: Lists active user sessions (IP, device name parsed via `uap-java`), revokes specific sessions, and prunes expired tokens after a 30-day forensic retention period.
+   - **`AuthAuditService`**: Asynchronously persists authentication successes, failures, logouts, and reuse breaches.
+4. **Environment-Aware Cookie Transport**:
+   - `RefreshCookieFactory` generates `HttpOnly`, `SameSite=Strict` cookies bound to the path `/api/v1/auth`.
+   - Binds `Secure=false` on local development/test profiles to simplify localhost testing, and `Secure=true` in production/staging environments.

@@ -30,28 +30,30 @@ Ensure you have the following installed on your system:
 
 3. **Backend Environment Variables Configuration**:
    The backend reads connection and security parameters from environment variables. Ensure these variables are exported in your terminal before building/running, or defined in your IDE configuration:
-   - On Windows (PowerShell):
-     ```powershell
-     $env:DB_HOST="localhost"
-     $env:DB_PORT="3306"
-     $env:DB_NAME="secure_file_vault"
-     $env:DB_USERNAME="root"
-     $env:DB_PASSWORD="your_mysql_password"
-     $env:JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
-     $env:JWT_EXPIRATION="3600000"
-     $env:JWT_ISSUER="SecureFileVault"
-     ```
-   - On Linux/macOS:
-     ```bash
-     export DB_HOST="localhost"
-     export DB_PORT="3306"
-     export DB_NAME="secure_file_vault"
-     export DB_USERNAME="root"
-     export DB_PASSWORD="your_mysql_password"
-     export JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
-     export JWT_EXPIRATION="3600000"
-     export JWT_ISSUER="SecureFileVault"
-     ```
+    - On Windows (PowerShell):
+      ```powershell
+      $env:DB_HOST="localhost"
+      $env:DB_PORT="3306"
+      $env:DB_NAME="secure_file_vault"
+      $env:DB_USERNAME="root"
+      $env:DB_PASSWORD="your_mysql_password"
+      $env:JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
+      $env:JWT_EXPIRATION="3600000"
+      $env:JWT_ISSUER="SecureFileVault"
+      $env:REFRESH_TOKEN_HMAC_SECRET="refresh_hmac_secret_key_which_is_long_and_secure_32_bytes"
+      ```
+    - On Linux/macOS:
+      ```bash
+      export DB_HOST="localhost"
+      export DB_PORT="3306"
+      export DB_NAME="secure_file_vault"
+      export DB_USERNAME="root"
+      export DB_PASSWORD="your_mysql_password"
+      export JWT_SECRET="my_super_secret_key_of_at_least_32_characters_long_for_hmac_256"
+      export JWT_EXPIRATION="3600000"
+      export JWT_ISSUER="SecureFileVault"
+      export REFRESH_TOKEN_HMAC_SECRET="refresh_hmac_secret_key_which_is_long_and_secure_32_bytes"
+      ```
 
 ## Running the Application
 
@@ -219,6 +221,87 @@ Two test routes are exposed under `/api/v1/test` to verify request authenticatio
     "statusCode": 401
   }
   ```
+
+### 3. Token Rotation (Refresh) Endpoint
+- **Method**: `POST`
+- **URL**: `/api/v1/auth/refresh`
+- **Cookie Required**:
+  - `refresh_token`: `<your_refresh_token>`
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Token refreshed successfully",
+    "data": {
+      "accessToken": "eyJhbGciOi...",
+      "tokenType": "Bearer",
+      "expiresInMs": 900000
+    },
+    "timestamp": "2026-07-29T12:00:00.000Z",
+    "statusCode": 200
+  }
+  ```
+
+### 4. Active Sessions Endpoint (JWT Required)
+- **Method**: `GET`
+- **URL**: `/api/v1/auth/sessions`
+- **Headers**:
+  - `Authorization`: `Bearer <your_jwt_token>`
+- **Cookie (Optional for current indicator)**:
+  - `refresh_token`: `<your_refresh_token>`
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Active sessions retrieved",
+    "data": [
+      {
+        "id": 1,
+        "deviceName": "Chrome on Windows",
+        "ipAddress": "127.0.0.1",
+        "lastUsedAt": "2026-07-29T11:59:50.000Z",
+        "createdAt": "2026-07-29T11:00:00.000Z",
+        "expiresAt": "2026-08-05T11:00:00.000Z",
+        "currentSession": true
+      }
+    ],
+    "timestamp": "2026-07-29T12:00:05.000Z",
+    "statusCode": 200
+  }
+  ```
+
+### 5. Revoke Device Session (JWT Required)
+- **Method**: `DELETE`
+- **URL**: `/api/v1/auth/sessions/{id}`
+- **Headers**:
+  - `Authorization`: `Bearer <your_jwt_token>`
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Session revoked successfully",
+    "data": null,
+    "timestamp": "2026-07-29T12:00:10.000Z",
+    "statusCode": 200
+  }
+  ```
+
+### 6. User Logout Endpoint
+- **Method**: `POST`
+- **URL**: `/api/v1/auth/logout`
+- **Cookie Required**:
+  - `refresh_token`: `<your_refresh_token>`
+- **Sample Success Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "message": "Logged out successfully",
+    "data": null,
+    "timestamp": "2026-07-29T12:00:15.000Z",
+    "statusCode": 200
+  }
+  ```
+
 
 
 

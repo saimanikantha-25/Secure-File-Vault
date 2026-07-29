@@ -38,7 +38,8 @@ public class JwtService {
                     + secretBytes.length * 8 + " bits.");
         }
 
-        if (jwtProperties.getExpirationMs() <= 0) {
+        long expMs = jwtProperties.getAccessExpirationMs() > 0 ? jwtProperties.getAccessExpirationMs() : jwtProperties.getExpirationMs();
+        if (expMs <= 0) {
             throw new IllegalStateException("JWT expiration duration must be greater than zero.");
         }
 
@@ -59,7 +60,8 @@ public class JwtService {
 
     public String generateToken(User user) {
         Instant now = Instant.now();
-        Instant expiration = now.plusMillis(jwtProperties.getExpirationMs());
+        long exp = jwtProperties.getAccessExpirationMs() > 0 ? jwtProperties.getAccessExpirationMs() : jwtProperties.getExpirationMs();
+        Instant expiration = now.plusMillis(exp);
 
         return Jwts.builder()
                 .subject(user.getUsername())

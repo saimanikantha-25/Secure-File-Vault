@@ -18,4 +18,7 @@ public class LoginResponse {
     private String email;
     private String role;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
+    private String rawRefreshToken;
+
 }
